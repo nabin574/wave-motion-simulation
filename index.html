@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Motion Interactive Physics Simulation</title>
+    <!-- Tailwind CSS for Modern Responsive UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styling for canvas and UI elements */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        canvas {
+            background-color: #1e293b;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- Header Navigation Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-sky-400">Wave Motion Simulations</h1>
+                <p class="text-xs text-slate-400">Class 11 Physics Notes Interactive Visualizations</p>
+            </div>
+            
+            <!-- Topic Selection Tabs -->
+            <nav class="flex flex-wrap gap-2 justify-center" id="tabContainer">
+                <button onclick="switchTab('types')" id="tab-types" class="px-3 py-1.5 text-sm font-medium rounded-lg transition bg-sky-600 text-white">1. Wave Types</button>
+                <button onclick="switchTab('progressive')" id="tab-progressive" class="px-3 py-1.5 text-sm font-medium rounded-lg transition bg-slate-800 text-slate-300 hover:bg-slate-700">2. Progressive Wave</button>
+                <button onclick="switchTab('phase')" id="tab-phase" class="px-3 py-1.5 text-sm font-medium rounded-lg transition bg-slate-800 text-slate-300 hover:bg-slate-700">3. Phase & Path</button>
+                <button onclick="switchTab('superposition')" id="tab-superposition" class="px-3 py-1.5 text-sm font-medium rounded-lg transition bg-slate-800 text-slate-300 hover:bg-slate-700">4. Superposition</button>
+                <button onclick="switchTab('standing')" id="tab-standing" class="px-3 py-1.5 text-sm font-medium rounded-lg transition bg-slate-800 text-slate-300 hover:bg-slate-700">5. Standing Waves</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Simulation Area -->
+    <main class="max-w-7xl mx-auto w-full p-4 my-auto flex flex-col gap-6">
+
+        <!-- Top Panel: Simulation Title & Description -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h2 id="simTitle" class="text-xl font-semibold text-sky-300">Longitudinal vs Transverse Waves</h2>
+                <p id="simDesc" class="text-sm text-slate-400 mt-1">Comparing particle vibration direction relative to wave propagation direction.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="playPauseBtn" onclick="togglePlayPause()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 font-semibold text-white rounded-lg transition shadow">Pause</button>
+                <button onclick="resetSimulation()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-lg transition border border-slate-700">Reset</button>
+            </div>
+        </div>
+
+        <!-- Middle Grid: Canvas Display & Parameter Controls -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+            <!-- Canvas Viewport -->
+            <div class="lg:col-span-3 flex flex-col gap-2">
+                <div class="relative w-full aspect-[16/9] min-h-[320px]">
+                    <canvas id="simCanvas" class="w-full h-full block"></canvas>
+                </div>
+                <!-- Dynamic Wave Formulas & Realtime Info -->
+                <div id="mathInfo" class="bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs md:text-sm font-mono text-amber-300 flex flex-wrap justify-between gap-2">
+                    <!-- Dynamic Info populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Interactive Controls Sidebar -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-5 h-full">
+                <h3 class="font-semibold text-slate-200 border-b border-slate-800 pb-2">Simulation Controls</h3>
+                
+                <div id="controlsContainer" class="flex flex-col gap-4">
+                    <!-- Controls will be dynamically inserted here based on selected tab -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 text-center text-slate-500 text-xs py-3">
+        Physics Wave Motion Visualizer &bull; Based on Class 11 Physics Curriculum
+    </footer>
+
+    <!-- JavaScript Logic & Simulation Engine -->
+    <script>
+        // --- Canvas Setup & Variables ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let currentTab = 'types';
+        let isRunning = true;
+        let animationId;
+        let time = 0;
+
+        // Interactive Simulation Parameters
+        let params = {
+            amplitude: 40,      // Amplitude (a)
+            frequency: 1.0,     // Frequency (f in Hz)
+            wavelength: 200,   // Wavelength (lambda in pixels)
+            waveSpeed: 200,     // v = f * lambda
+            direction: 1,       // 1 for right (+x), -1 for left (-x)
+            pointDistance: 100, // Distance x for Phase Difference calculation
+            wave1Amp: 30,
+            wave2Amp: 30,
+            wave1Dir: 1,
+            wave2Dir: -1
+        };
+
+        // Resize Canvas dynamically
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- Tab Switching Logic ---
+        function switchTab(tabName) {
+            currentTab = tabName;
+
+            // Highlight Active Tab
+            document.querySelectorAll('#tabContainer button').forEach(btn => {
+                btn.className = "px-3 py-1.5 text-sm font-medium rounded-lg transition bg-slate-800 text-slate-300 hover:bg-slate-700";
+            });
+            document.getElementById(`tab-${tabName}`).className = "px-3 py-1.5 text-sm font-medium rounded-lg transition bg-sky-600 text-white";
+
+            // Update Descriptions & Controls
+            updateUIForTab();
+            resetSimulation();
+        }
+
+        // Update Text and Controls according to selected topic
+        function updateUIForTab() {
+            const title = document.getElementById('simTitle');
+            const desc = document.getElementById('simDesc');
+            const controls = document.getElementById('controlsContainer');
+
+            if (currentTab === 'types') {
+                title.innerText = "1. Longitudinal vs Transverse Waves";
+                desc.innerText = "Comparison of Longitudinal Wave (Compressions & Rarefactions) vs Transverse Wave (Crests & Troughs).";
+                controls.innerHTML = `
+                    <label class="text-xs text-slate-400">Amplitude (a): <span id="ampVal" class="text-sky-400">40</span> px</label>
+                    <input type="range" min="10" max="60" value="${params.amplitude}" oninput="params.amplitude=+this.value; document.getElementById('ampVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Frequency (f): <span id="freqVal" class="text-sky-400">1.0</span> Hz</label>
+                    <input type="range" min="0.2" max="3.0" step="0.1" value="${params.frequency}" oninput="params.frequency=+this.value; document.getElementById('freqVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Wavelength (&lambda;): <span id="waveVal" class="text-sky-400">200</span> px</label>
+                    <input type="range" min="100" max="400" step="10" value="${params.wavelength}" oninput="params.wavelength=+this.value; document.getElementById('waveVal').innerText=this.value;">
+                `;
+            } else if (currentTab === 'progressive') {
+                title.innerText = "2. Progressive Wave Equation";
+                desc.innerText = "Visualization of y = a sin(&omega;t - kx) propagating continuously through a medium.";
+                controls.innerHTML = `
+                    <label class="text-xs text-slate-400">Amplitude (a): <span id="ampVal" class="text-sky-400">${params.amplitude}</span> px</label>
+                    <input type="range" min="10" max="80" value="${params.amplitude}" oninput="params.amplitude=+this.value; document.getElementById('ampVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Frequency (f): <span id="freqVal" class="text-sky-400">${params.frequency}</span> Hz</label>
+                    <input type="range" min="0.2" max="3.0" step="0.1" value="${params.frequency}" oninput="params.frequency=+this.value; document.getElementById('freqVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Wavelength (&lambda;): <span id="waveVal" class="text-sky-400">${params.wavelength}</span> px</label>
+                    <input type="range" min="100" max="400" step="10" value="${params.wavelength}" oninput="params.wavelength=+this.value; document.getElementById('waveVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Direction of Propagation:</label>
+                    <div class="flex gap-2">
+                        <button onclick="params.direction=1; updateDirectionUI()" id="dirRight" class="flex-1 py-1 bg-sky-600 text-white rounded text-xs">Right (+x)</button>
+                        <button onclick="params.direction=-1; updateDirectionUI()" id="dirLeft" class="flex-1 py-1 bg-slate-800 text-slate-300 rounded text-xs">Left (-x)</button>
+                    </div>
+                `;
+            } else if (currentTab === 'phase') {
+                title.innerText = "3. Phase & Path Difference";
+                desc.innerText = "Demonstrating Phase Difference &phi; = (2&pi; / &lambda;) &times; Path Difference (x) between two points.";
+                controls.innerHTML = `
+                    <label class="text-xs text-slate-400">Path Difference (x): <span id="pathVal" class="text-sky-400">${params.pointDistance}</span> px</label>
+                    <input type="range" min="0" max="300" step="5" value="${params.pointDistance}" oninput="params.pointDistance=+this.value; document.getElementById('pathVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Wavelength (&lambda;): <span id="waveVal" class="text-sky-400">${params.wavelength}</span> px</label>
+                    <input type="range" min="100" max="400" step="10" value="${params.wavelength}" oninput="params.wavelength=+this.value; document.getElementById('waveVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Frequency (f): <span id="freqVal" class="text-sky-400">${params.frequency}</span> Hz</label>
+                    <input type="range" min="0.2" max="2.0" step="0.1" value="${params.frequency}" oninput="params.frequency=+this.value; document.getElementById('freqVal').innerText=this.value;">
+                `;
+            } else if (currentTab === 'superposition') {
+                title.innerText = "4. Principle of Superposition";
+                desc.innerText = "When two waves overlap, resultant displacement y = y1 + y2.";
+                controls.innerHTML = `
+                    <label class="text-xs text-slate-400">Wave 1 Amplitude: <span id="amp1Val" class="text-sky-400">${params.wave1Amp}</span></label>
+                    <input type="range" min="0" max="50" value="${params.wave1Amp}" oninput="params.wave1Amp=+this.value; document.getElementById('amp1Val').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Wave 2 Amplitude: <span id="amp2Val" class="text-emerald-400">${params.wave2Amp}</span></label>
+                    <input type="range" min="0" max="50" value="${params.wave2Amp}" oninput="params.wave2Amp=+this.value; document.getElementById('amp2Val').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Wave 2 Direction:</label>
+                    <div class="flex gap-2">
+                        <button onclick="params.wave2Dir=1; updateDir2UI()" id="w2Right" class="flex-1 py-1 bg-slate-800 text-slate-300 rounded text-xs">Same Direction (+x)</button>
+                        <button onclick="params.wave2Dir=-1; updateDir2UI()" id="w2Left" class="flex-1 py-1 bg-emerald-600 text-white rounded text-xs">Opposite (-x)</button>
+                    </div>
+                `;
+            } else if (currentTab === 'standing') {
+                title.innerText = "5. Stationary / Standing Wave";
+                desc.innerText = "Formed by superposition of two identical waves moving in opposite directions. Contains Nodes & Antinodes.";
+                controls.innerHTML = `
+                    <label class="text-xs text-slate-400">Individual Wave Amp (a): <span id="ampVal" class="text-sky-400">30</span> px</label>
+                    <input type="range" min="10" max="50" value="30" oninput="params.amplitude=+this.value; document.getElementById('ampVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Frequency (f): <span id="freqVal" class="text-sky-400">${params.frequency}</span> Hz</label>
+                    <input type="range" min="0.2" max="2.0" step="0.1" value="${params.frequency}" oninput="params.frequency=+this.value; document.getElementById('freqVal').innerText=this.value;">
+
+                    <label class="text-xs text-slate-400">Wavelength (&lambda;): <span id="waveVal" class="text-sky-400">${params.wavelength}</span> px</label>
+                    <input type="range" min="100" max="400" step="10" value="${params.wavelength}" oninput="params.wavelength=+this.value; document.getElementById('waveVal').innerText=this.value;">
+                `;
+            }
+        }
+
+        function updateDirectionUI() {
+            document.getElementById('dirRight').className = params.direction === 1 ? "flex-1 py-1 bg-sky-600 text-white rounded text-xs" : "flex-1 py-1 bg-slate-800 text-slate-300 rounded text-xs";
+            document.getElementById('dirLeft').className = params.direction === -1 ? "flex-1 py-1 bg-sky-600 text-white rounded text-xs" : "flex-1 py-1 bg-slate-800 text-slate-300 rounded text-xs";
+        }
+
+        function updateDir2UI() {
+            document.getElementById('w2Right').className = params.wave2Dir === 1 ? "flex-1 py-1 bg-emerald-600 text-white rounded text-xs" : "flex-1 py-1 bg-slate-800 text-slate-300 rounded text-xs";
+            document.getElementById('w2Left').className = params.wave2Dir === -1 ? "flex-1 py-1 bg-emerald-600 text-white rounded text-xs" : "flex-1 py-1 bg-slate-800 text-slate-300 rounded text-xs";
+        }
+
+        // --- Rendering Logic for Various Topics ---
+
+        // 1. Draw Longitudinal vs Transverse Waves
+        function drawTypes() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const k = (2 * Math.PI) / params.wavelength;
+            const omega = 2 * Math.PI * params.frequency;
+
+            // --- Transverse Wave ---
+            const yCenterTransverse = h * 0.3;
+            ctx.fillStyle = "#38bdf8";
+            ctx.font = "14px sans-serif";
+            ctx.fillText("Transverse Wave (Particles vibrate PERPENDICULAR to wave propagation)", 20, yCenterTransverse - 60);
+
+            // Equilibrium line
+            ctx.strokeStyle = "#334155";
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, yCenterTransverse);
+            ctx.lineTo(w, yCenterTransverse);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          // Draw Transverse Wave Sine Curve
+            ctx.strokeStyle = "#38bdf8";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let y = yCenterTransverse - params.amplitude * Math.sin(omega * time - k * x);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Transverse Particles
+            for (let x = 30; x < w; x += 40) {
+                let y = yCenterTransverse - params.amplitude * Math.sin(omega * time - k * x);
+                ctx.fillStyle = "#f43f5e";
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Labels for Crest & Trough
+            ctx.fillStyle = "#e2e8f0";
+            ctx.font = "12px sans-serif";
+            ctx.fillText("Crest", w / 4, yCenterTransverse - params.amplitude - 10);
+            ctx.fillText("Trough", w / 2, yCenterTransverse + params.amplitude + 20);
+
+            // --- Longitudinal Wave ---
+            const yCenterLong = h * 0.75;
+            ctx.fillStyle = "#34d399";
+            ctx.font = "14px sans-serif";
+            ctx.fillText("Longitudinal Wave (Particles vibrate ALONG the direction of wave propagation)", 20, yCenterLong - 70);
+
+            // Grid of Particles representing Compressions & Rarefactions
+            const cols = Math.floor(w / 15);
+            const rows = 5;
+
+            for (let c = 0; c < cols; c++) {
+                let xOrig = c * 15;
+                // Displacement along x-axis for longitudinal
+                let dx = params.amplitude * Math.sin(omega * time - k * xOrig);
+
+                for (let r = 0; r < rows; r++) {
+                    let y = yCenterLong - 30 + r * 15;
+                    ctx.fillStyle = (c % 5 === 0) ? "#f59e0b" : "#34d399";
+                    ctx.beginPath();
+                    ctx.arc(xOrig + dx, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Labels for Compression and Rarefaction
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillText("Compression (High Density)", w * 0.25, yCenterLong + 55);
+            ctx.fillText("Rarefaction (Low Density)", w * 0.55, yCenterLong + 55);
+
+            // Update Math Info
+            const waveSpeed = params.frequency * params.wavelength;
+            document.getElementById('mathInfo').innerHTML = `
+                <span>Wave Speed (v) = f &times; &lambda; = ${waveSpeed.toFixed(1)} px/s</span>
+                <span>Frequency (f) = ${params.frequency} Hz</span>
+                <span>Wavelength (&lambda;) = ${params.wavelength} px</span>
+            `;
+        }
+
+        // 2. Draw Progressive Wave
+        function drawProgressive() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const centerY = h / 2;
+            const k = (2 * Math.PI) / params.wavelength;
+            const omega = 2 * Math.PI * params.frequency;
+
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "14px sans-serif";
+            ctx.fillText(`Progressive Wave: y = a sin(&omega;t ${params.direction === 1 ? '-' : '+'} kx)`, 20, 30);
+
+            // Equilibrium line
+            ctx.strokeStyle = "#475569";
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(w, centerY);
+            ctx.stroke();
+
+            // Wave curve
+            ctx.strokeStyle = "#0284c7";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let y = centerY - params.amplitude * Math.sin(omega * time - params.direction * k * x);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Particles on wave
+            for (let x = 0; x < w; x += 30) {
+                let y = centerY - params.amplitude * Math.sin(omega * time - params.direction * k * x);
+                ctx.fillStyle = "#e11d48";
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const waveSpeed = params.frequency * params.wavelength * params.direction;
+            document.getElementById('mathInfo').innerHTML = `
+                <span>Equation: y = ${params.amplitude} sin(${(omega).toFixed(1)}t ${params.direction === 1 ? '-' : '+'} ${(k).toFixed(3)}x)</span>
+                <span>k = 2&pi;/&lambda; = ${k.toFixed(3)} rad/px</span>
+                <span>Wave Velocity = ${waveSpeed.toFixed(1)} px/s</span>
+            `;
+        }
+
+        // 3. Draw Phase and Path Difference
+        function drawPhase() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const centerY = h / 2;
+            const k = (2 * Math.PI) / params.wavelength;
+            const omega = 2 * Math.PI * params.frequency;
+
+            const x1 = w * 0.25;
+            const x2 = x1 + params.pointDistance;
+
+            const y1 = centerY - params.amplitude * Math.sin(omega * time - k * x1);
+            const y2 = centerY - params.amplitude * Math.sin(omega * time - k * x2);
+
+            // Draw wave
+            ctx.strokeStyle = "#64748b";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let y = centerY - params.amplitude * Math.sin(omega * time - k * x);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Highlight Point 1
+            ctx.fillStyle = "#38bdf8";
+            ctx.beginPath();
+            ctx.arc(x1, y1, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillText("Point P1 (x1)", x1 - 30, y1 - 15);
+
+            // Highlight Point 2
+            ctx.fillStyle = "#f43f5e";
+            ctx.beginPath();
+            ctx.arc(x2, y2, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillText("Point P2 (x2)", x2 - 30, y2 - 15);
+
+            // Path Difference visual line
+            ctx.strokeStyle = "#f59e0b";
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x1, centerY + params.amplitude + 30);
+            ctx.lineTo(x2, centerY + params.amplitude + 30);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillText(`Path Difference (x) = ${params.pointDistance} px`, (x1 + x2) / 2 - 60, centerY + params.amplitude + 50);
+
+            // Calculate Phase Difference
+            const phaseDiffRad = (2 * Math.PI / params.wavelength) * params.pointDistance;
+            const phaseDiffDeg = (phaseDiffRad * 180 / Math.PI) % 360;
+
+            document.getElementById('mathInfo').innerHTML = `
+                <span>Formula: &phi; = (2&pi; / &lambda;) &times; x</span>
+                <span>Path Diff (x) = ${params.pointDistance} px</span>
+                <span>Phase Diff (&phi;) = ${phaseDiffRad.toFixed(2)} rad (${phaseDiffDeg.toFixed(1)}&deg;)</span>
+            `;
+        }
+
+        // 4. Draw Superposition Principle
+        function drawSuperposition() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const k = (2 * Math.PI) / params.wavelength;
+            const omega = 2 * Math.PI * params.frequency;
+
+            const y1Center = h * 0.22;
+            const y2Center = h * 0.48;
+            const yResCenter = h * 0.8;
+
+            // Wave 1
+            ctx.strokeStyle = "#38bdf8";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let y = y1Center - params.wave1Amp * Math.sin(omega * time - k * x);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.fillStyle = "#38bdf8";
+            ctx.fillText("Wave 1 (y1)", 20, y1Center - 30);
+
+            // Wave 2
+            ctx.strokeStyle = "#34d399";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let y = y2Center - params.wave2Amp * Math.sin(omega * time - params.wave2Dir * k * x);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.fillStyle = "#34d399";
+            ctx.fillText("Wave 2 (y2)", 20, y2Center - 30);
+
+            // Resultant Wave (y = y1 + y2)
+            ctx.strokeStyle = "#f43f5e";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let disp1 = params.wave1Amp * Math.sin(omega * time - k * x);
+                let disp2 = params.wave2Amp * Math.sin(omega * time - params.wave2Dir * k * x);
+                let yRes = yResCenter - (disp1 + disp2);
+                if (x === 0) ctx.moveTo(x, yRes);
+                else ctx.lineTo(x, yRes);
+            }
+            ctx.stroke();
+            ctx.fillStyle = "#f43f5e";
+          ctx.fillText("Resultant Wave (y = y1 + y2)", 20, yResCenter - 55);
+
+            document.getElementById('mathInfo').innerHTML = `
+                <span>Principle of Superposition: Vector sum of displacements</span>
+                <span>y = y1 + y2</span>
+            `;
+        }
+
+        // 5. Draw Stationary Wave
+        function drawStanding() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const centerY = h / 2;
+            const k = (2 * Math.PI) / params.wavelength;
+            const omega = 2 * Math.PI * params.frequency;
+
+            ctx.fillStyle = "#f8fafc";
+            ctx.font = "14px sans-serif";
+            ctx.fillText("Stationary Wave Equation: y = 2a cos(kx) sin(&omega;t)", 20, 30);
+
+            // Base Center Axis
+            ctx.strokeStyle = "#475569";
+            ctx.beginPath();
+            ctx.moveTo(0, centerY);
+            ctx.lineTo(w, centerY);
+            ctx.stroke();
+
+            // Draw Envelope
+            ctx.strokeStyle = "#334155";
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let ampMax = 2 * params.amplitude * Math.cos(k * x);
+                ctx.lineTo(x, centerY - ampMax);
+            }
+            ctx.stroke();
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let ampMax = 2 * params.amplitude * Math.cos(k * x);
+                ctx.lineTo(x, centerY + ampMax);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+            // Draw Standing Wave Motion
+            ctx.strokeStyle = "#a855f7";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                let y = centerY - (2 * params.amplitude * Math.cos(k * x) * Math.sin(omega * time));
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Identify Nodes (A=0) & Antinodes (A=Max)
+            for (let x = 0; x < w; x += 1) {
+                // Nodes where cos(kx) = 0 => kx = (2n+1)*pi/2
+                let val = Math.cos(k * x);
+                if (Math.abs(val) < 0.01) {
+                    ctx.fillStyle = "#ef4444";
+                    ctx.beginPath();
+                    ctx.arc(x, centerY, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillText("N", x - 4, centerY + 20);
+                }
+                // Antinodes where |cos(kx)| = 1
+                if (Math.abs(Math.abs(val) - 1) < 0.005) {
+                    ctx.fillStyle = "#22c55e";
+                    ctx.beginPath();
+                    ctx.arc(x, centerY, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillText("A", x - 4, centerY - 20);
+                }
+            }
+
+            const distNodeNode = params.wavelength / 2;
+            const distNodeAntinode = params.wavelength / 4;
+
+            document.getElementById('mathInfo').innerHTML = `
+                <span>Max Amplitude = 2a = ${2 * params.amplitude} px</span>
+                <span>Node to Node (&lambda;/2) = ${distNodeNode.toFixed(1)} px</span>
+                <span>Node to Antinode (&lambda;/4) = ${distNodeAntinode.toFixed(1)} px</span>
+            `;
+        }
+
+        // --- Main Simulation Loop ---
+        function animate() {
+            // Clear Frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (currentTab === 'types') drawTypes();
+            else if (currentTab === 'progressive') drawProgressive();
+            else if (currentTab === 'phase') drawPhase();
+            else if (currentTab === 'superposition') drawSuperposition();
+            else if (currentTab === 'standing') drawStanding();
+
+            if (isRunning) {
+                time += 0.016; // Approx 60 FPS
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        // Play/Pause Controls
+        function togglePlayPause() {
+            isRunning = !isRunning;
+            const btn = document.getElementById('playPauseBtn');
+            btn.innerText = isRunning ? "Pause" : "Play";
+            btn.className = isRunning ? "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 font-semibold text-white rounded-lg transition shadow" 
+                                      : "px-4 py-2 bg-amber-600 hover:bg-amber-500 font-semibold text-white rounded-lg transition shadow";
+        }
+
+        function resetSimulation() {
+            time = 0;
+            if (!isRunning) togglePlayPause();
+        }
+
+        // Initialization
+        updateUIForTab();
+        animate();
+    </script>
+</body>
+</html>
